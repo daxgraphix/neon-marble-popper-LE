@@ -11,19 +11,19 @@ import { Play, RotateCcw, Trophy, Skull, Zap, Bomb, Clock, Shield, ChevronRight,
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
-const MARBLE_RADIUS = 15;
+const MARBLE_RADIUS = 16;
 const MARBLE_DIAMETER = MARBLE_RADIUS * 2;
-const SHOOTER_RADIUS = 30;
-const PROJECTILE_SPEED = 16;
+const SHOOTER_RADIUS = 32;
+const PROJECTILE_SPEED = 22;
 const COLORS = [
-  { name: 'ruby', fill: '#FF2D55', glow: '#FF2D55' },
-  { name: 'cyan', fill: '#00FBFF', glow: '#00FBFF' },
-  { name: 'emerald', fill: '#00FF95', glow: '#00FF95' },
-  { name: 'amber', fill: '#FFCC00', glow: '#FFCC00' },
-  { name: 'violet', fill: '#AF52FF', glow: '#AF52FF' },
-  { name: 'orange', fill: '#FF9500', glow: '#FF9500' },
-  { name: 'magenta', fill: '#FF00FF', glow: '#FF00FF' },
-  { name: 'gold', fill: '#FFD700', glow: '#FFD700' },
+  { name: 'ruby', fill: '#FF3366', glow: '#FF1144', emoji: '🔴' },
+  { name: 'cyan', fill: '#00EEFF', glow: '#00CCFF', emoji: '🔵' },
+  { name: 'emerald', fill: '#00FF88', glow: '#00DD66', emoji: '🟢' },
+  { name: 'amber', fill: '#FFDD00', glow: '#FFBB00', emoji: '🟡' },
+  { name: 'violet', fill: '#BB66FF', glow: '#9944FF', emoji: '🟣' },
+  { name: 'orange', fill: '#FF9933', glow: '#FF7700', emoji: '🟠' },
+  { name: 'magenta', fill: '#FF44FF', glow: '#DD22FF', emoji: '🟣' },
+  { name: 'gold', fill: '#FFDD44', glow: '#FFBB22', emoji: '🟡' },
 ];
 
 type Color = typeof COLORS[0];
@@ -41,7 +41,7 @@ interface LevelConfig {
   spawnRate: number;
   maxMarbles: number;
   colors: Color[];
-  pathType: 'spiral' | 's-curve' | 'loop' | 'zigzag' | 'heart' | 'circular' | 'curvy';
+  pathType: 'spiral' | 's-curve' | 'loop' | 'zigzag' | 'heart' | 'circular' | 'curvy' | 'horizontal' | 'side-scroll';
   obstacles: ObstacleConfig[];
   challenge: {
     targetScore: number;
@@ -125,22 +125,33 @@ class Particle {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rotation);
-    ctx.globalAlpha = Math.min(1, this.life * 1.5);
+    const alpha = Math.min(1, this.life * 1.5);
     
     if (this.type === 'glow') {
-      ctx.shadowBlur = 25;
+      // Outer glow
+      ctx.globalAlpha = alpha * 0.3;
+      ctx.shadowBlur = 30;
       ctx.shadowColor = this.color;
       ctx.fillStyle = this.color;
       ctx.beginPath();
-      ctx.arc(0, 0, this.size * this.life, 0, Math.PI * 2);
+      ctx.arc(0, 0, this.size * this.life * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      // Core
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.size * this.life * 0.7, 0, Math.PI * 2);
       ctx.fill();
     } else if (this.type === 'ring') {
       ctx.strokeStyle = this.color;
-      ctx.lineWidth = 3 * this.life;
+      ctx.lineWidth = (3 + this.life * 2) * this.life;
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = this.color;
       ctx.beginPath();
-      ctx.arc(0, 0, this.size * (1.2 - this.life), 0, Math.PI * 2);
+      ctx.arc(0, 0, this.size * (1.2 - this.life * 0.5), 0, Math.PI * 2);
       ctx.stroke();
     } else if (this.type === 'streak') {
+      ctx.globalAlpha = alpha;
       ctx.fillStyle = this.color;
       ctx.beginPath();
       ctx.moveTo(0, -this.size);
@@ -150,31 +161,33 @@ class Particle {
       ctx.closePath();
       ctx.fill();
     } else if (this.type === 'smoke') {
-      const currentSize = this.size * (1.2 - this.life * 0.5);
-      const alpha = Math.floor(this.life * 180);
-      const alphaHex = alpha.toString(16).padStart(2, '0');
+      const currentSize = this.size * (1.5 - this.life * 0.6);
       const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, currentSize);
-      const r = this.color.startsWith('rgba') ? this.color : this.color.startsWith('#') ? this.color : '#' + this.color;
-      const isRgba = r.startsWith('rgba');
-      const colorVal = isRgba ? r.replace(/[\d.]+\)$/, (this.life * 0.7).toFixed(2) + ')') : (() => {
-        const hex = r.startsWith('#') ? r.slice(1) : r;
-        const hr = parseInt(hex.slice(0, 2), 16) || 0;
-        const hg = parseInt(hex.slice(2, 4), 16) || 0;
-        const hb = parseInt(hex.slice(4, 6), 16) || 0;
-        return `rgba(${hr}, ${hg}, ${hb}, ${(this.life * 0.7).toFixed(2)})`;
-      })();
-      grad.addColorStop(0, colorVal);
+      const hex = this.color.startsWith('#') ? this.color.slice(1) : this.color;
+      const hr = parseInt(hex.slice(0, 2), 16) || 255;
+      const hg = parseInt(hex.slice(2, 4), 16) || 255;
+      const hb = parseInt(hex.slice(4, 6), 16) || 255;
+      grad.addColorStop(0, `rgba(${hr}, ${hg}, ${hb}, ${this.life * 0.6})`);
+      grad.addColorStop(0.5, `rgba(${hr}, ${hg}, ${hb}, ${this.life * 0.3})`);
       grad.addColorStop(1, 'transparent');
       ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(0, 0, currentSize, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      ctx.shadowBlur = 8;
+      // Spark particle with glow
+      ctx.globalAlpha = alpha * 0.5;
+      ctx.shadowBlur = 15;
       ctx.shadowColor = this.color;
       ctx.fillStyle = this.color;
       ctx.beginPath();
-      ctx.arc(0, 0, this.size * this.life, 0, Math.PI * 2);
+      ctx.arc(0, 0, this.size * this.life * 1.3, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Bright core
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.size * this.life * 0.5, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
@@ -221,25 +234,24 @@ class Projectile {
   }
 
   update(time: number) {
-    if (time - this.lastTrailTime > 20) {
+    // Reduced trail for performance
+    if (time - this.lastTrailTime > 25) {
       this.trail.unshift({ x: this.x, y: this.y, alpha: 1.0 });
       this.lastTrailTime = time;
     }
-    if (this.trail.length > 22) this.trail.pop();
-    this.trail.forEach(t => t.alpha *= 0.85);
+    if (this.trail.length > 15) this.trail.pop();
+    this.trail.forEach(t => t.alpha *= 0.82);
 
     this.x += this.vx;
     this.y += this.vy;
     this.vy += this.gravity;
-    this.vx *= 0.997;
+    this.vx *= 0.998;
     this.rotation += this.spinSpeed;
-    this.impactScale = Math.max(1, this.impactScale - 0.08);
-    this.impactFlash = Math.max(0, this.impactFlash - 0.15);
+    this.impactScale = Math.max(1, this.impactScale - 0.1);
   }
 
   triggerImpactEffect() {
-    this.impactScale = 1.5;
-    this.impactFlash = 1;
+    this.impactScale = 1.3;
   }
 
   isOffScreen() {
@@ -252,17 +264,38 @@ class Projectile {
   }
 
   draw(ctx: CanvasRenderingContext2D) {
+    // Enhanced trail effect
+    ctx.save();
+    if (this.trail.length > 0) {
+      // Draw trail as connected glow
+      ctx.beginPath();
+      ctx.moveTo(this.trail[0].x, this.trail[0].y);
+      for (let i = 1; i < this.trail.length; i++) {
+        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+      }
+      ctx.lineTo(this.x, this.y);
+      ctx.strokeStyle = this.color.glow;
+      ctx.lineWidth = MARBLE_RADIUS * 0.6;
+      ctx.lineCap = 'round';
+      ctx.globalAlpha = 0.3;
+      ctx.stroke();
+      
+      // Inner trail
+      ctx.strokeStyle = this.color.fill;
+      ctx.lineWidth = MARBLE_RADIUS * 0.3;
+      ctx.globalAlpha = 0.5;
+      ctx.stroke();
+    }
+    ctx.restore();
+    
+    // Trail particles
     ctx.save();
     this.trail.forEach((p, i) => {
       const sizeMult = 1 - (i / this.trail.length);
-      const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, MARBLE_RADIUS * sizeMult);
-      gradient.addColorStop(0, this.color.fill);
-      gradient.addColorStop(0.5, this.color.fill + '80');
-      gradient.addColorStop(1, 'transparent');
-      ctx.globalAlpha = p.alpha * 0.5;
-      ctx.fillStyle = gradient;
+      ctx.globalAlpha = p.alpha * 0.4;
+      ctx.fillStyle = this.color.fill;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, MARBLE_RADIUS * sizeMult * 0.8, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, sizeMult * 6, 0, Math.PI * 2);
       ctx.fill();
     });
     ctx.restore();
@@ -272,28 +305,9 @@ class Projectile {
     ctx.rotate(this.rotation);
     ctx.scale(this.impactScale, this.impactScale);
     
-    if (this.impactFlash > 0) {
-      ctx.shadowBlur = 40;
-      ctx.shadowColor = `rgba(255, 255, 255, ${this.impactFlash})`;
-    } else {
-      ctx.shadowBlur = 25;
-      ctx.shadowColor = this.color.glow;
-    }
-    
+    // Use marble texture
     const texture = getMarbleTexture(this.color);
     ctx.drawImage(texture, -texture.width / 2, -texture.height / 2);
-    
-    ctx.fillStyle = 'white';
-    ctx.globalAlpha = 0.4 * this.impactScale;
-    ctx.beginPath();
-    ctx.arc(MARBLE_RADIUS * 0.25, -MARBLE_RADIUS * 0.25, MARBLE_RADIUS * 0.35, 0, Math.PI * 2);
-    ctx.fill();
-    
-    ctx.globalAlpha = 0.3;
-    ctx.fillStyle = this.color.glow;
-    ctx.beginPath();
-    ctx.arc(0, 0, MARBLE_RADIUS * 1.2, 0, Math.PI * 2);
-    ctx.fill();
     
     ctx.restore();
   }
@@ -663,7 +677,7 @@ interface LevelConfig {
   spawnRate: number;
   maxMarbles: number;
   colors: Color[];
-  pathType: 'spiral' | 's-curve' | 'loop' | 'zigzag' | 'heart' | 'circular' | 'curvy';
+  pathType: 'spiral' | 's-curve' | 'loop' | 'zigzag' | 'heart' | 'circular' | 'curvy' | 'horizontal' | 'side-scroll';
   obstacles: ObstacleConfig[];
   challenge: {
     targetScore: number;
@@ -1080,32 +1094,74 @@ const getMarbleTexture = (color: Color): HTMLCanvasElement => {
   if (marbleCache[color.name]) return marbleCache[color.name];
 
   const canvas = document.createElement('canvas');
-  canvas.width = MARBLE_RADIUS * 2 + 10;
-  canvas.height = MARBLE_RADIUS * 2 + 10;
+  canvas.width = MARBLE_RADIUS * 2 + 24;
+  canvas.height = MARBLE_RADIUS * 2 + 24;
   const ctx = canvas.getContext('2d');
   if (ctx) {
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
     
-    ctx.shadowBlur = 10;
+    // Outer glow
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    ctx.shadowBlur = 20;
     ctx.shadowColor = color.glow;
+    ctx.fillStyle = color.fill;
+    ctx.beginPath();
+    ctx.arc(cx, cy, MARBLE_RADIUS + 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
     
+    // Main gradient - 3D effect
     const grad = ctx.createRadialGradient(
-      cx - MARBLE_RADIUS * 0.3, 
-      cy - MARBLE_RADIUS * 0.3, 
-      MARBLE_RADIUS * 0.1,
+      cx - MARBLE_RADIUS * 0.35, 
+      cy - MARBLE_RADIUS * 0.35, 
+      0,
       cx, 
       cy, 
       MARBLE_RADIUS
     );
-    grad.addColorStop(0, 'white');
-    grad.addColorStop(0.2, color.fill);
-    grad.addColorStop(1, 'black');
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.15, color.fill);
+    grad.addColorStop(0.7, color.glow);
+    grad.addColorStop(1, '#1a0010');
     
+    ctx.save();
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = color.glow;
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(cx, cy, MARBLE_RADIUS, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+    
+    // Inner highlight
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    const highlightGrad = ctx.createRadialGradient(
+      cx - MARBLE_RADIUS * 0.4, 
+      cy - MARBLE_RADIUS * 0.4, 
+      0,
+      cx - MARBLE_RADIUS * 0.2, 
+      cy - MARBLE_RADIUS * 0.2, 
+      MARBLE_RADIUS * 0.5
+    );
+    highlightGrad.addColorStop(0, 'rgba(255,255,255,0.8)');
+    highlightGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = highlightGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, MARBLE_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    
+    // Specular highlight
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(cx - MARBLE_RADIUS * 0.3, cy - MARBLE_RADIUS * 0.3, MARBLE_RADIUS * 0.35, MARBLE_RADIUS * 0.25, -Math.PI / 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
   marbleCache[color.name] = canvas;
   return canvas;
@@ -1144,9 +1200,19 @@ const generatePath = (type: string): PathData => {
       points.push({ x: last.x + i * 10, y: last.y });
     }
   } else if (type === 'zigzag') {
-    const step = CANVAS_WIDTH / 8;
-    for (let i = 0; i <= 8; i++) {
-      points.push({ x: i * step, y: i % 2 === 0 ? 100 : 500 });
+    for (let x = CANVAS_WIDTH + 50; x >= -50; x -= 10) {
+      const y = 150 + Math.sin((x / CANVAS_WIDTH) * Math.PI * 4) * 100;
+      points.push({ x, y: Math.max(80, Math.min(CANVAS_HEIGHT - 80, y + CANVAS_HEIGHT / 2)) });
+    }
+  } else if (type === 'horizontal') {
+    for (let x = CANVAS_WIDTH + 50; x >= -50; x -= 5) {
+      points.push({ x, y: CANVAS_HEIGHT / 2 + Math.sin(x * 0.02) * 30 });
+    }
+  } else if (type === 'side-scroll') {
+    for (let x = CANVAS_WIDTH + 100; x >= -100; x -= 5) {
+      const progress = (CANVAS_WIDTH + 100 - x) / (CANVAS_WIDTH + 200);
+      const y = CANVAS_HEIGHT * 0.3 + CANVAS_HEIGHT * 0.4 * progress + Math.sin(progress * Math.PI * 6) * 60;
+      points.push({ x, y: Math.max(100, Math.min(CANVAS_HEIGHT - 100, y)) });
     }
   } else if (type === 'heart') {
     for (let t = 0; t < Math.PI * 2; t += 0.05) {
@@ -1656,17 +1722,7 @@ export default function App() {
     }
   }, []);
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (gameState !== 'playing') return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
-    const centerX = CANVAS_WIDTH / 2, centerY = CANVAS_HEIGHT / 2;
-    setTargetAngle(Math.atan2(y - centerY, x - centerX));
-  };
-
-  const handleClick = useCallback(() => {
+  const handleTap = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
     if (gameState !== 'playing' || isPaused || showIntro) return;
     
     sounds.playShoot();
@@ -1675,24 +1731,47 @@ export default function App() {
     setShooterPulse(10);
   }, [gameState, isPaused, showIntro, levelConfig]);
 
+  const handleAim = useCallback((clientX: number, clientY: number) => {
+    if (gameState !== 'playing') return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = CANVAS_WIDTH / rect.width;
+    const scaleY = CANVAS_HEIGHT / rect.height;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+    const centerX = CANVAS_WIDTH / 2;
+    const centerY = CANVAS_HEIGHT / 2;
+    setTargetAngle(Math.atan2(y - centerY, x - centerX));
+  }, [gameState]);
+
+  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    handleAim(e.clientX, e.clientY);
+  };
+
+  const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches[0]) {
+      handleAim(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
   const update = useCallback((time: number) => {
     requestRef.current = requestAnimationFrame(update);
     
-    // Game logic only runs when properly in playing state with no intro/pause
     if (gameState !== 'playing' || isPaused || showIntro) {
-      // Still render basic frame but skip game logic
       return;
     }
 
-    if (shake > 0) setShake(prev => Math.max(0, prev - 0.5));
-    if (flash > 0) setFlash(prev => Math.max(0, prev - 0.02));
-    if (shooterPulse > 0) setShooterPulse(prev => Math.max(0, prev - 1));
+    // Direct state updates without callback for speed
+    if (shake > 0) setShake(s => Math.max(0, s - 0.5));
+    if (flash > 0) setFlash(s => Math.max(0, s - 0.03));
+    if (shooterPulse > 0) setShooterPulse(s => Math.max(0, s - 1));
 
-    // Smooth shooter rotation
+    // Faster shooter rotation
     let diff = targetAngle - shooterAngleRef.current;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    shooterAngleRef.current += diff * 0.2;
+    if (diff > Math.PI) diff -= Math.PI * 2;
+    else if (diff < -Math.PI) diff += Math.PI * 2;
+    shooterAngleRef.current += diff * 0.25;
 
     if (slowMoActive && time > slowMoTimerRef.current) setSlowMoActive(false);
 
@@ -1700,17 +1779,14 @@ export default function App() {
     const projectiles = projectilesRef.current;
     const obstacles = obstaclesRef.current;
 
-    // 2. Movement
-    const levelGroup = Math.floor((level - 1) / 5);
-    const difficultySpeedMult = 1 + (levelGroup * 0.1);
-    const difficultySpawnMult = 1 - (levelGroup * 0.05);
+    // Simplified difficulty calculations
+    const levelGroup = (level - 1) >> 2;
+    const difficultySpeedMult = 1 + levelGroup * 0.08;
+    const difficultySpawnMult = 1 - levelGroup * 0.04;
     
-    const timeInLevel = (time - lastSpawnTimeRef.current) / 60000;
-    const timeSpeedMult = 1 + Math.min(0.5, timeInLevel * 0.2);
-    
-    const baseSpeed = 1.5 * difficultySpeedMult * timeSpeedMult * gameSpeed;
-    const speedMult = slowMoActive ? 0.3 : 1;
-    const currentSpawnRate = (levelConfig.spawnRate * difficultySpawnMult) / gameSpeed;
+    const baseSpeed = 2.2 * difficultySpeedMult * gameSpeed;
+    const speedMult = slowMoActive ? 0.4 : 1;
+    const currentSpawnRate = levelConfig.spawnRate * difficultySpawnMult / gameSpeed;
 
     // Spawning
     if (spawnCountRef.current < levelConfig.maxMarbles && time - lastSpawnTimeRef.current > currentSpawnRate && chain.length < 100) {
@@ -1736,6 +1812,8 @@ export default function App() {
       for (let i = chain.length - 2; i >= 0; i--) {
         const m = chain[i];
         const prev = chain[i + 1];
+        
+        if (!m || !prev || m.distance === undefined || prev.distance === undefined) continue;
         
         const idealDist = MARBLE_DIAMETER;
         const currentDist = prev.distance - m.distance;
@@ -1901,42 +1979,68 @@ export default function App() {
       if (shake > 0) {
         ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
       }
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      
-      if (gameState === 'start') {
-        // Animated Background for Splash Screen
-        ctx.fillStyle = theme === 'dark' ? '#050505' : '#f8f8f8';
-        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-        
-        // Grid
-        ctx.strokeStyle = theme === 'dark' ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)';
-        ctx.lineWidth = 1;
-        const gridSize = 40;
-        const offset = (time * 0.01) % gridSize;
-        for (let x = offset; x < CANVAS_WIDTH; x += gridSize) {
-          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_HEIGHT); ctx.stroke();
-        }
-        for (let y = offset; y < CANVAS_HEIGHT; y += gridSize) {
-          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_WIDTH, y); ctx.stroke();
-        }
+ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+       
+       if (gameState === 'start') {
+         // Professional dark gradient background
+         const bgGrad = ctx.createLinearGradient(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+         bgGrad.addColorStop(0, theme === 'dark' ? '#0a0a12' : '#f0f4f8');
+         bgGrad.addColorStop(0.5, theme === 'dark' ? '#0d0d18' : '#e8eef4');
+         bgGrad.addColorStop(1, theme === 'dark' ? '#08080f' : '#f4f6f8');
+         ctx.fillStyle = bgGrad;
+         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+         
+         // Animated grid with depth effect
+         ctx.strokeStyle = theme === 'dark' ? 'rgba(255, 255, 255, 0.025)' : 'rgba(0, 0, 0, 0.02)';
+         ctx.lineWidth = 1;
+         const gridSize = 50;
+         const offset = (time * 0.008) % gridSize;
+         for (let x = offset; x < CANVAS_WIDTH; x += gridSize) {
+           ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_HEIGHT); ctx.stroke();
+         }
+         for (let y = offset; y < CANVAS_HEIGHT; y += gridSize) {
+           ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_WIDTH, y); ctx.stroke();
+         }
+         
+         // Radial vignette
+         const vigGrad = ctx.createRadialGradient(CANVAS_WIDTH/2, CANVAS_HEIGHT/2, 0, CANVAS_WIDTH/2, CANVAS_HEIGHT/2, CANVAS_WIDTH * 0.7);
+         vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+         vigGrad.addColorStop(1, theme === 'dark' ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.1)');
+         ctx.fillStyle = vigGrad;
+         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-        // Floating Orbs
-        for (let i = 0; i < 10; i++) {
-          const x = (Math.sin(time * 0.001 + i) * 0.5 + 0.5) * CANVAS_WIDTH;
-          const y = (Math.cos(time * 0.0008 + i * 2) * 0.5 + 0.5) * CANVAS_HEIGHT;
-          const color = COLORS[i % COLORS.length];
-          ctx.save();
-          ctx.shadowBlur = 20;
-          ctx.shadowColor = color.glow;
-          ctx.fillStyle = color.fill;
-          ctx.globalAlpha = theme === 'dark' ? 0.1 : 0.05;
-          ctx.beginPath();
-          ctx.arc(x, y, 30 + Math.sin(time * 0.002 + i) * 10, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        }
-        return;
-      }
+         // Floating Orbs with glow
+         for (let i = 0; i < 12; i++) {
+           const x = (Math.sin(time * 0.0008 + i * 1.5) * 0.6 + 0.5) * CANVAS_WIDTH;
+           const y = (Math.cos(time * 0.0006 + i * 2) * 0.6 + 0.5) * CANVAS_HEIGHT;
+           const color = COLORS[i % COLORS.length];
+           const size = 20 + Math.sin(time * 0.002 + i) * 15;
+           
+           ctx.save();
+           // Outer glow
+           ctx.globalAlpha = theme === 'dark' ? 0.15 : 0.08;
+           ctx.shadowBlur = 40;
+           ctx.shadowColor = color.glow;
+           ctx.fillStyle = color.fill;
+           ctx.beginPath();
+           ctx.arc(x, y, size * 1.5, 0, Math.PI * 2);
+           ctx.fill();
+           
+          // Inner glow
+           ctx.globalAlpha = theme === 'dark' ? 0.3 : 0.15;
+           ctx.beginPath();
+           ctx.arc(x, y, size, 0, Math.PI * 2);
+           ctx.fill();
+           
+           // Core
+           ctx.globalAlpha = theme === 'dark' ? 0.6 : 0.4;
+           ctx.beginPath();
+           ctx.arc(x, y, size * 0.4, 0, Math.PI * 2);
+           ctx.fill();
+           ctx.restore();
+         }
+         return;
+       }
 
       ctx.save();
       if (shake > 0) {
@@ -1945,27 +2049,79 @@ export default function App() {
         ctx.translate(sx, sy);
       }
 
-      // Path
-      const isDanger = chain.some(m => m.distance > pathRef.current.totalLength * 0.8);
+      // Background gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      bgGrad.addColorStop(0, theme === 'dark' ? '#0a0a14' : '#f0f4f8');
+      bgGrad.addColorStop(1, theme === 'dark' ? '#08080f' : '#e4e8ec');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      // Grid
+      ctx.strokeStyle = theme === 'dark' ? 'rgba(255, 255, 255, 0.015)' : 'rgba(0, 0, 0, 0.015)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < CANVAS_WIDTH; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_HEIGHT); ctx.stroke();
+      }
+      for (let y = 0; y < CANVAS_HEIGHT; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_WIDTH, y); ctx.stroke();
+      }
+
+      // Path with danger indicator
+      const isDanger = chain.some(m => m.distance > pathRef.current.totalLength * 0.7);
+      const isCritical = chain.some(m => m.distance > pathRef.current.totalLength * 0.85);
+      
+      // Path glow base
       ctx.beginPath();
-      ctx.strokeStyle = isDanger ? `rgba(255, 0, 0, ${0.1 + Math.sin(time * 0.01) * 0.05})` : (theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)');
-      ctx.lineWidth = 40;
+      ctx.strokeStyle = theme === 'dark' ? 'rgba(60, 60, 80, 0.4)' : 'rgba(200, 205, 210, 0.6)';
+      ctx.lineWidth = 48;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       const path = pathRef.current;
       ctx.moveTo(path.points[0].x, path.points[0].y);
       for (let i = 1; i < path.points.length; i++) ctx.lineTo(path.points[i].x, path.points[i].y);
       ctx.stroke();
+      
+      // Active path line
+      ctx.beginPath();
+      if (isCritical) {
+        ctx.strokeStyle = `rgba(255, 50, 50, ${0.4 + Math.sin(time * 0.015) * 0.2})`;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ff3333';
+      } else if (isDanger) {
+        ctx.strokeStyle = `rgba(255, 150, 50, ${0.3 + Math.sin(time * 0.01) * 0.15})`;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ff9933';
+      } else {
+        ctx.strokeStyle = theme === 'dark' ? 'rgba(100, 100, 150, 0.3)' : 'rgba(180, 185, 195, 0.5)';
+        ctx.shadowBlur = 0;
+      }
+      ctx.lineWidth = 32;
+      ctx.moveTo(path.points[0].x, path.points[0].y);
+      for (let i = 1; i < path.points.length; i++) ctx.lineTo(path.points[i].x, path.points[i].y);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
 
-      // Path Glow
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.01)';
-      ctx.lineWidth = 50;
+      // Path center line
+      ctx.beginPath();
+      ctx.strokeStyle = theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(100, 100, 110, 0.15)';
+      ctx.lineWidth = 4;
+      ctx.moveTo(path.points[0].x, path.points[0].y);
+      for (let i = 1; i < path.points.length; i++) ctx.lineTo(path.points[i].x, path.points[i].y);
       ctx.stroke();
 
-      // Particles
-      for (let i = particlesRef.current.length - 1; i >= 0; i--) {
+      // Radial vignette
+      const vigGrad = ctx.createRadialGradient(CANVAS_WIDTH/2, CANVAS_HEIGHT/2, 0, CANVAS_WIDTH/2, CANVAS_HEIGHT/2, CANVAS_WIDTH * 0.8);
+      vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vigGrad.addColorStop(0.7, 'rgba(0, 0, 0, 0)');
+      vigGrad.addColorStop(1, theme === 'dark' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)');
+      ctx.fillStyle = vigGrad;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      // Particles - limit count for performance
+      const maxParticles = 30;
+      for (let i = Math.min(particlesRef.current.length, maxParticles) - 1; i >= 0; i--) {
         const p = particlesRef.current[i];
-        p.update(time);
+        p.update();
         p.draw(ctx);
         if (p.life <= 0) particlesRef.current.splice(i, 1);
       }
@@ -1973,77 +2129,9 @@ export default function App() {
       // Obstacles
       obstacles.forEach(obs => obs.draw(ctx, theme));
 
-      // Marbles
+      // Marbles - simplified render
       chain.forEach(m => {
-        let pos = getPointOnPath(m.distance);
-        
-        // Pushing effect from rotating obstacles & Pulling from magnetic
-        obstacles.forEach(obs => {
-          if (!obs.destroyed) {
-            if (obs.type === 'rotating') {
-              const obsPos = obs.getPos();
-              const dSq = getDistanceSq(pos, obsPos);
-              const limit = (obs.radius + MARBLE_RADIUS + 50) ** 2;
-              if (dSq < limit && dSq > 0) {
-                const d = Math.sqrt(dSq);
-                const angle = Math.atan2(pos.y - obsPos.y, pos.x - obsPos.x);
-                
-                // Calculate rotation direction influence
-                const rotationDir = obs.speed > 0 ? 1 : -1;
-                const absSpeed = Math.abs(obs.speed);
-                
-                // Proximity factor - stronger when closer
-                const proximityFactor = 1 - (d / (obs.radius + MARBLE_RADIUS + 50));
-                
-                // Speed factor - faster rotation = stronger push
-                const speedFactor = Math.min(absSpeed * 3, 2);
-                
-                // Combined push force with rotation direction
-                const basePush = (Math.sqrt(limit) - d) * 0.5;
-                const rotationPush = rotationDir * proximityFactor * speedFactor * 3;
-                const totalForce = basePush + Math.abs(rotationPush);
-                
-                // Apply push in rotation direction + outward push
-                const pushAngle = angle + (rotationDir * Math.PI / 2);
-                pos.x += Math.cos(pushAngle) * Math.abs(rotationPush) * 0.5;
-                pos.y += Math.sin(pushAngle) * Math.abs(rotationPush) * 0.5;
-                
-                // Also push outward
-                pos.x += Math.cos(angle) * basePush;
-                pos.y += Math.sin(angle) * basePush;
-                
-                // Add rotation particles when very close
-                if (d < obs.radius + MARBLE_RADIUS + 20 && Math.random() < 0.15) {
-                  const particleAngle = Math.random() * Math.PI * 2;
-                  particlesRef.current.push(new Particle(
-                    obsPos.x + Math.cos(particleAngle) * obs.radius,
-                    obsPos.y + Math.sin(particleAngle) * obs.radius,
-                    obs.speed > 0 ? '#ff00ff' : '#00ffff',
-                    'spark'
-                  ));
-                }
-              }
-            } else if (obs.type === 'magnetic') {
-              const obsPos = obs.getPos();
-              const dSq = getDistanceSq(pos, obsPos);
-              const effectivePullRadius = obs.pullRadius * magneticSettings.radius;
-              const pullLimitSq = effectivePullRadius ** 2;
-              if (dSq < pullLimitSq) {
-                const d = Math.sqrt(dSq);
-                const angle = Math.atan2(obsPos.y - pos.y, obsPos.x - pos.x);
-                const force = (1 - d / effectivePullRadius) * obs.strength * 50 * magneticSettings.strength;
-                pos.x += Math.cos(angle) * force;
-                pos.y += Math.sin(angle) * force;
-                
-                // Add magnetic particles
-                if (Math.random() < 0.1) {
-                  particlesRef.current.push(new Particle(pos.x, pos.y, '#00ffff', 'glow'));
-                }
-              }
-            }
-          }
-        });
-
+        const pos = getPointOnPath(m.distance);
         const texture = getMarbleTexture(m.color);
         ctx.drawImage(texture, pos.x - texture.width / 2, pos.y - texture.height / 2);
         
@@ -2141,48 +2229,76 @@ export default function App() {
         ctx.restore();
       }
 
-      ctx.rotate(shooterAngleRef.current);
-      
-      const pulseScale = 1 + (shooterPulse / 50);
-      ctx.scale(pulseScale, pulseScale);
+      const pulseScale = 1 + (shooterPulse / 40);
 
-      ctx.shadowBlur = 20;
+      // Rotate shooter to aim direction
+      ctx.save();
+      ctx.rotate(shooterAngleRef.current);
+
+      // Outer glow ring
+      ctx.save();
+      ctx.shadowBlur = 30;
       ctx.shadowColor = nextColorRef.current.glow;
-      ctx.fillStyle = '#1a1a1a';
       ctx.strokeStyle = nextColorRef.current.fill;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.3 * pulseScale;
+      ctx.beginPath();
+      ctx.arc(0, 0, SHOOTER_RADIUS + 15, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // Main shooter body - sleek design
+      ctx.save();
+      // Outer ring
+      ctx.shadowBlur = 25;
+      ctx.shadowColor = nextColorRef.current.glow;
+      ctx.strokeStyle = theme === 'dark' ? '#2a2a35' : '#d0d2d8';
+      ctx.lineWidth = 6;
       ctx.beginPath();
       ctx.arc(0, 0, SHOOTER_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
       ctx.stroke();
       
-      // Barrel
-      ctx.fillStyle = '#333';
-      ctx.fillRect(0, -10, 45, 20);
-      ctx.strokeRect(0, -10, 45, 20);
-      
-      // Loaded Marble 3D
+      // Inner fill
+      const shooterFillGrad = ctx.createRadialGradient(0, -10, 0, 0, 0, SHOOTER_RADIUS);
+      shooterFillGrad.addColorStop(0, theme === 'dark' ? '#3a3a48' : '#f8f9fa');
+      shooterFillGrad.addColorStop(1, theme === 'dark' ? '#1a1a25' : '#d8dadd');
+      ctx.fillStyle = shooterFillGrad;
+      ctx.fill();
+
+      // Loaded marble with 3D effect
       const shooterGrad = ctx.createRadialGradient(
-        -MARBLE_RADIUS * 0.3, 
-        -MARBLE_RADIUS * 0.3, 
-        MARBLE_RADIUS * 0.1,
+        -MARBLE_RADIUS * 0.25, 
+        -MARBLE_RADIUS * 0.25, 
+        0,
         0, 
         0, 
-        MARBLE_RADIUS
+        MARBLE_RADIUS * 1.2
       );
-      shooterGrad.addColorStop(0, 'white');
-      shooterGrad.addColorStop(0.2, nextColorRef.current.fill);
-      shooterGrad.addColorStop(1, 'black');
+      shooterGrad.addColorStop(0, '#ffffff');
+      shooterGrad.addColorStop(0.15, nextColorRef.current.fill);
+      shooterGrad.addColorStop(0.7, nextColorRef.current.glow);
+      shooterGrad.addColorStop(1, '#000000');
       
       ctx.fillStyle = shooterGrad;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = nextColorRef.current.glow;
       ctx.beginPath();
-      ctx.arc(0, 0, MARBLE_RADIUS, 0, Math.PI * 2);
+      ctx.arc(0, 0, MARBLE_RADIUS * pulseScale, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
+      
+      // Shine
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.beginPath();
+      ctx.arc(-MARBLE_RADIUS * 0.3, -MARBLE_RADIUS * 0.3, MARBLE_RADIUS * 0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore(); // End rotate
+      
+      ctx.restore(); // End shooter rotation
 
       // Screen Flash
       if (flash > 0) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${flash})`;
+        // Replace white flash with colored flash from hit color
+        ctx.fillStyle = `rgba(255, 150, 200, ${flash * 0.3})`;
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       }
 
@@ -2259,7 +2375,7 @@ export default function App() {
       // Button 0 (A on Xbox, X on PS) - Shoot with debounce
       const now = Date.now();
       if (gp.buttons[0].pressed && now - lastButton0Time > 150) {
-        handleClick();
+        handleTap();
         lastButton0Time = now;
       }
 
@@ -2272,7 +2388,7 @@ export default function App() {
 
     gamepadInterval = window.setInterval(pollGamepad, 16);
     return () => clearInterval(gamepadInterval);
-  }, [gamepadActive, gameState, isPaused, handleClick]);
+  }, [gamepadActive, gameState, isPaused, handleTap]);
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(update);
@@ -2280,15 +2396,17 @@ export default function App() {
   }, [update]);
 
   return (
-    <div className={`min-h-screen min-h-dvh ${theme === 'dark' ? 'bg-[#050505] text-white' : 'bg-[#f0f2f5] text-slate-900'} flex items-center justify-center p-2 sm:p-4 font-sans selection:bg-pink-500/30 transition-colors duration-700`}>
-      <div className={`game-container relative w-full max-w-[800px] aspect-[4/3] ${theme === 'dark' ? 'bg-[#0a0a0a] border-white/10 shadow-black' : 'bg-white border-black/5 shadow-slate-200'} rounded-xl sm:rounded-2xl lg:rounded-[2.5rem] border shadow-2xl transition-all duration-700 overflow-y-auto`}>
-        
-        {/* Fixed Right-Side Scrollbar */}
-        <div className="fixed right-0 top-0 bottom-0 w-3 sm:w-4 pointer-events-none z-[9999]">
-          <div className="absolute right-1 sm:right-2 top-4 sm:top-6 bottom-4 sm:bottom-6 w-2 sm:w-3 rounded-full bg-gradient-to-b from-pink-500 via-purple-500 to-violet-600 shadow-[0_0_15px_rgba(236,72,153,0.8),0_0_30px_rgba(139,92,246,0.6)]"></div>
-        </div>
-        
-        <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} onMouseMove={handleMouseMove} onClick={handleClick} className="w-full h-full cursor-crosshair touch-none" />
+    <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-[#050505] text-white' : 'bg-[#f0f2f5] text-slate-900'} font-sans selection:bg-pink-500/30 transition-colors duration-700 overflow-hidden`}>
+      <div className="absolute inset-0">
+        <canvas 
+          ref={canvasRef} 
+          width={CANVAS_WIDTH} 
+          height={CANVAS_HEIGHT} 
+          onClick={handleTap}
+          onMouseMove={onMouseMove}
+          onTouchMove={onTouchMove}
+          className="w-full h-full touch-manipulation cursor-crosshair" 
+        />
 
         <div className="hud-top-left absolute top-2 sm:top-4 md:top-6 left-2 sm:left-4 md:left-6 lg:top-8 lg:left-8 pointer-events-none flex flex-col gap-2 sm:gap-4 md:gap-6">
           <div className="flex flex-col gap-0.5 sm:gap-1">

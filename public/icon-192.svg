@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ec4899"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="32" fill="url(#bg)"/>
+  <circle cx="96" cy="96" r="50" fill="#00e5ff">
+    <animate attributeName="r" values="50;55;50" dur="1s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="80" cy="80" r="20" fill="white" opacity="0.6"/>
+  <text x="96" y="170" text-anchor="middle" fill="white" font-family="Arial" font-size="24" font-weight="bold">NEON</text>
+</svg>

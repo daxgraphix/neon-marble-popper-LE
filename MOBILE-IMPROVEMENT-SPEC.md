@@ -4,6 +4,47 @@
 
 ---
 
+## Small Screen Device Optimization Guide
+
+### Recommended Settings for Small Screens (< 380px)
+
+| Element | Current | Recommended |
+|---------|---------|--------------|
+| HUD Font Size | 14-16px | 12-14px |
+| Button Size | 44px min | 48px min |
+| Padding | 8px | 4-6px |
+| Gap between elements | 8px | 4px |
+| Canvas Margin | 16px | 8px |
+
+### Touch Target Guidelines (Apple HIG)
+- Minimum: 44x44 points
+- Recommended: 48x48 points for frequently used
+- Icons: 24x24 in content, 44x44 in navigation
+
+### Safe Area Implementation
+```css
+/* iOS Safe Areas */
+padding-top: env(safe-area-inset-top);
+padding-bottom: env(safe-area-inset-bottom);
+padding-left: env(safe-area-inset-left);
+padding-right: env(safe-area-inset-right);
+```
+
+### Small Screen Best Practices
+1. Use `dvh` (dynamic viewport height) for full screen
+2. Avoid fixed heights - use `min-height` instead
+3. Use `clamp()` for fluid typography
+4. Implement gesture-based navigation (swipe)
+5. Reduce animation complexity on low-end devices
+
+### Performance Considerations
+- Use `will-change` sparingly
+- Implement frame rate monitoring
+- Use `IntersectionObserver` for off-screen elements
+- Lazy load non-critical resources
+
+---
+
 ## 1. Mobile Responsiveness & Fluid Layouts
 
 ### 1.1 Viewport Configuration

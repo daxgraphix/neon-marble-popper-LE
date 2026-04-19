@@ -63,6 +63,41 @@ body {
   max-height: calc(100dvh - 2rem);
 }
 
+/* Mobile-first full screen canvas */
+@media (max-width: 768px) {
+  .canvas-container {
+    aspect-ratio: auto;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    border-radius: 0 !important;
+  }
+  
+  .game-container {
+    border-radius: 0 !important;
+  }
+}
+
+/* Tablet and up */
+@media (min-width: 769px) {
+  .canvas-container {
+    aspect-ratio: 4 / 3;
+    max-height: calc(100vh - 4rem);
+    max-height: calc(100dvh - 4rem);
+    border-radius: 1.5rem;
+  }
+}
+
+/* Desktop large screens */
+@media (min-width: 1200px) {
+  .canvas-container {
+    max-width: 900px;
+    max-height: 675px;
+    border-radius: 2rem;
+  }
+}
+
 /* Game HUD Styles */
 .hud-panel {
   background: rgba(0, 0, 0, 0.5);
@@ -138,6 +173,86 @@ body {
   transform: scale(0.95);
 }
 
+/* Responsive HUD for extra small screens */
+@media (max-width: 380px) {
+  .hud-panel {
+    padding: 4px 6px;
+  }
+  
+  .hud-label {
+    font-size: 7px;
+    letter-spacing: 0.08em;
+  }
+  
+  .hud-value {
+    font-size: 14px;
+  }
+  
+  .hud-score {
+    font-size: 16px;
+  }
+  
+  .hud-combo {
+    font-size: 12px;
+  }
+  
+  .hud-level {
+    font-size: 12px;
+  }
+  
+  .progress-bar {
+    height: 4px;
+  }
+  
+  .game-btn {
+    padding: 6px 12px;
+    font-size: 10px;
+    min-height: 44px;
+  }
+  
+  .modal-content {
+    padding: 12px;
+    border-radius: 12px;
+  }
+  
+  .title-text {
+    font-size: 1.5rem;
+  }
+}
+
+/* Touch-friendly adjustments for mobile */
+@media (hover: none) and (pointer: coarse) {
+  /* Increase touch targets on mobile */
+  .game-btn,
+  .hud-btn,
+  button {
+    min-height: 48px;
+    min-width: 48px;
+    padding: 12px 20px;
+  }
+  
+  /* Larger touch feedback */
+  .game-btn:active {
+    transform: scale(0.92);
+  }
+}
+
+/* Ultra small screens (< 320px) */
+@media (max-width: 320px) {
+  .title-text {
+    font-size: 1.25rem;
+  }
+  
+  .hud-score {
+    font-size: 14px;
+  }
+  
+  .feature-cards {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+}
+
 @media (max-width: 640px) {
   .canvas-container {
     border-radius: 1rem;
@@ -146,17 +261,20 @@ body {
   .hud-top-left {
     top: 0.5rem !important;
     left: 0.5rem !important;
+    gap: 0.25rem !important;
   }
   
   .hud-top-right {
     top: 0.5rem !important;
     right: 0.5rem !important;
+    gap: 0.25rem !important;
   }
   
   .hud-controls {
     top: 0.5rem !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
+    gap: 0.25rem !important;
   }
   
   .hud-bottom-left {

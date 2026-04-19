@@ -33,6 +33,14 @@
 canvas {
   touch-action: none;
   pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  canvas {
+    cursor: pointer;
+  }
 }
 
 html, body, #root {

@@ -1722,15 +1722,32 @@ export default function App() {
     }
   }, []);
 
-  const handleTap = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
+  const lastShotTime = useRef(0);
+  
+  const handleShoot = useCallback(() => {
     if (gameState !== 'playing' || isPaused || showIntro) return;
     
+    const now = Date.now();
+    if (now - lastShotTime.current < 150) return;
+    lastShotTime.current = now;
+    
+    // Play sound without delay
     sounds.playShoot();
+    
+    // Instant projectile for responsive feel
     projectilesRef.current.push(new Projectile(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, shooterAngleRef.current, nextColorRef.current));
     nextColorRef.current = levelConfig.colors[Math.floor(Math.random() * levelConfig.colors.length)];
     setShooterPulse(10);
+    
+    // Haptic feedback on mobile
+    if ('vibrate' in navigator) {
+      navigator.vibrate(10);
+    }
   }, [gameState, isPaused, showIntro, levelConfig]);
 
+  // Keyboard state for desktop
+  const keysPressed = useRef<Set<string>>(new Set());
+  
   const handleAim = useCallback((clientX: number, clientY: number) => {
     if (gameState !== 'playing') return;
     const canvas = canvasRef.current;
@@ -1754,6 +1771,25 @@ export default function App() {
       handleAim(e.touches[0].clientX, e.touches[0].clientY);
     }
   };
+  
+  // Keyboard controls for desktop
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (gameState !== 'playing' || keysPressed.current.has(e.key)) return;
+    keysPressed.current.add(e.key);
+    
+    // Arrow keys for aiming
+    if (e.key === 'ArrowLeft') {
+      setTargetAngle(a => a - 0.2);
+    } else if (e.key === 'ArrowRight') {
+      setTargetAngle(a => a + 0.2);
+    } else if (e.key === ' ' || e.key === 'Enter') {
+      handleShoot();
+    }
+  }, [gameState]);
+  
+  const handleKeyUp = useCallback((e: KeyboardEvent) => {
+    keysPressed.current.delete(e.key);
+  }, []);
 
   const update = useCallback((time: number) => {
     requestRef.current = requestAnimationFrame(update);
@@ -2375,7 +2411,7 @@ ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       // Button 0 (A on Xbox, X on PS) - Shoot with debounce
       const now = Date.now();
       if (gp.buttons[0].pressed && now - lastButton0Time > 150) {
-        handleTap();
+        handleShoot();
         lastButton0Time = now;
       }
 
@@ -2388,12 +2424,40 @@ ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     gamepadInterval = window.setInterval(pollGamepad, 16);
     return () => clearInterval(gamepadInterval);
-  }, [gamepadActive, gameState, isPaused, handleTap]);
+  }, [gamepadActive, gameState, isPaused, handleShoot]);
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(update);
     return () => cancelAnimationFrame(requestRef.current);
   }, [update]);
+
+  // Keyboard controls
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [handleKeyDown, handleKeyUp]);
+
+  // Auto-fire when holding space (desktop)
+  useEffect(() => {
+    if (gameState !== 'playing') return;
+    const interval = setInterval(() => {
+      if (keysPressed.current.has(' ') || keysPressed.current.has('Enter')) {
+        handleShoot();
+      }
+      // Arrow key aiming while holding
+      if (keysPressed.current.has('ArrowLeft')) {
+        setTargetAngle(a => a - 0.15);
+      }
+      if (keysPressed.current.has('ArrowRight')) {
+        setTargetAngle(a => a + 0.15);
+      }
+    }, 50);
+    return () => clearInterval(interval);
+  }, [gameState, handleShoot]);
 
   return (
     <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-[#050505] text-white' : 'bg-[#f0f2f5] text-slate-900'} font-sans selection:bg-pink-500/30 transition-colors duration-700 overflow-hidden`}>
@@ -2402,9 +2466,10 @@ ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
           ref={canvasRef} 
           width={CANVAS_WIDTH} 
           height={CANVAS_HEIGHT} 
-          onClick={handleTap}
+          onClick={handleShoot}
           onMouseMove={onMouseMove}
           onTouchMove={onTouchMove}
+          onTouchStart={onMouseMove}
           className="w-full h-full touch-manipulation cursor-crosshair" 
         />
 
